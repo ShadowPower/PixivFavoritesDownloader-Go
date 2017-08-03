@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"pixivdownloader/util"
+	"./util"
 
 	"github.com/howeyc/gopass"
 )
