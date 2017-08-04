@@ -13,18 +13,24 @@ import (
 type Pixiv struct {
 	wc      *WebClient
 	Illusts chan string
+	IllustsMeta chan Illust
 
-	illustRe *regexp.Regexp // 预编译的从收藏夹中获取作品ID的正则表达式
+	illustIDRe   *regexp.Regexp // 从收藏夹中获取作品ID的正则表达式
+	illustMetaRe *regexp.Regexp // 从作品详情页面获取作品标题、作者名字的正则表达式
+	illustAuthorIDRe *regexp.Regexp // 从作品详情页面获取作者ID的正则表达式
 }
 
 // NewPixiv 用于创建一个 Pixiv 类的对象
 func NewPixiv() Pixiv {
-	wc := NewWebClient(10)
+	wc := NewWebClient(20)
 	pixiv := Pixiv{wc: &wc}
 	pixiv.Illusts = make(chan string, 500)
+	pixiv.IllustsMeta = make(chan Illust, 500)
 
 	// 编译正则表达式状态机
-	pixiv.illustRe, _ = regexp.Compile("data-click-action=\"illust\"data-click-label=\"(\\d+)\"")
+	pixiv.illustIDRe, _ = regexp.Compile("data-click-action=\"illust\"data-click-label=\"(\\d+)\"")
+	pixiv.illustMetaRe, _ = regexp.Compile("meta property=\"og:title\" content=\"「(.*)」/「(.*)」\\[pixiv\\]\"")
+	pixiv.illustAuthorIDRe, _ = regexp.Compile("data-user-id=\"(\\d+)\"")
 	return pixiv
 }
 
@@ -129,7 +135,7 @@ func (p *Pixiv) GetBookmarkTotalPages(rest string) int {
 func (p *Pixiv) ReadIllusts(pageNumber int, rest string) {
 	url := "https://www.pixiv.net/bookmark.php?rest=" + rest + "&p=" + strconv.Itoa(pageNumber)
 	body, _, _ := p.wc.Get(url, 5)
-	results := p.illustRe.FindAllSubmatch(body, -1)
+	results := p.illustIDRe.FindAllSubmatch(body, -1)
 	for _, result := range results {
 		p.Illusts <- string(result[1])
 	}
@@ -157,4 +163,35 @@ func (p *Pixiv) IsLogged() bool {
 		return false
 	}
 	return strings.Contains(string(body), "class=\"item header-logout\"")
+}
+
+func (p *Pixiv) GetIllustMetaData(illustID string) {
+	p.wc.InitHeaders()
+	p.wc.headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+
+	url := "https://www.pixiv.net/member_illust.php?mode=medium&illust_id=" + illustID
+	body, _, err := p.wc.Get(url, 5)
+	if err != nil {
+		fmt.Println("获取", illustID, "的信息时发生错误")
+		return
+	}
+
+	var iType int
+	sBody := string(body)
+	if strings.Contains(sBody, "pixiv.context.ugokuIllustData") {
+		iType = UGOKU
+	} else if strings.Contains(sBody, "class=\"page-count\"") {
+		iType = MULTI
+	} else {
+		iType = SINGLE
+	}
+
+	title := p.illustMetaRe.FindAllSubmatch(body, -1)
+	sName := string(title[1])
+	sAuthorName := string(title[2])
+
+	sAuthorID := string(p.illustAuthorIDRe.FindAllSubmatch(body, -1)[1])
+
+
+
 }
