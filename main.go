@@ -34,6 +34,18 @@ func main() {
 		}
 	}
 
+	// 简易测试
+	p.GetIllustMetaData("64174919")
+	p.GetIllustMetaData("26087911")
+	p.GetIllustMetaData("64066624")
+
+	for {
+		data := <- p.IllustsMeta
+		fmt.Print(data)
+	}
+	return
+
+
 	pagesOfShow := p.GetBookmarkTotalPages("show")
 	pagesOfHide := p.GetBookmarkTotalPages("hide")
 	fmt.Println("您的公开收藏夹一共有", pagesOfShow, "页")
@@ -41,8 +53,14 @@ func main() {
 
 	p.BatchReadIllusts(1, pagesOfShow, "show")
 
+	go func() {
+		for {
+			fmt.Println(<-p.IllustsMeta)
+		}
+	}()
+
 	for {
 		id := <-p.Illusts
-		fmt.Print(id + " ")
+		go p.GetIllustMetaData(id)
 	}
 }

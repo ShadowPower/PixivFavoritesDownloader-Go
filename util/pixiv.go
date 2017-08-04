@@ -11,13 +11,16 @@ import (
 
 // Pixiv 是一个中文版 Pixiv 网站的封装库
 type Pixiv struct {
-	wc      *WebClient
-	Illusts chan string
+	wc          *WebClient
+	Illusts     chan string
 	IllustsMeta chan Illust
 
-	illustIDRe   *regexp.Regexp // 从收藏夹中获取作品ID的正则表达式
-	illustMetaRe *regexp.Regexp // 从作品详情页面获取作品标题、作者名字的正则表达式
-	illustAuthorIDRe *regexp.Regexp // 从作品详情页面获取作者ID的正则表达式
+	illustIDRe        *regexp.Regexp // 从收藏夹中获取作品ID的正则表达式
+	illustMetaRe      *regexp.Regexp // 从作品详情页面获取作品标题、作者名字的正则表达式
+	illustAuthorIDRe  *regexp.Regexp // 从作品详情页面获取作者ID的正则表达式
+	illustSingleURLRe *regexp.Regexp // 获取单页作品URL的正则表达式
+	illustPageCountRe *regexp.Regexp // 获取多页作品页数的正则表达式
+	illustUgokuURLRe  *regexp.Regexp // 获取动图URL的正则表达式
 }
 
 // NewPixiv 用于创建一个 Pixiv 类的对象
@@ -31,6 +34,9 @@ func NewPixiv() Pixiv {
 	pixiv.illustIDRe, _ = regexp.Compile("data-click-action=\"illust\"data-click-label=\"(\\d+)\"")
 	pixiv.illustMetaRe, _ = regexp.Compile("meta property=\"og:title\" content=\"「(.*)」/「(.*)」\\[pixiv\\]\"")
 	pixiv.illustAuthorIDRe, _ = regexp.Compile("data-user-id=\"(\\d+)\"")
+	pixiv.illustSingleURLRe, _ = regexp.Compile("data-src=\"(.*)\" class=\"original-image\"")
+	pixiv.illustPageCountRe, _ = regexp.Compile("<div class=\"page-count\"><div class=\"icon\"></div><span>(\\d+)</span>")
+	pixiv.illustUgokuURLRe, _ = regexp.Compile("\"src\":\"(.*ugoira1920x1080.zip)\"")
 	return pixiv
 }
 
@@ -165,6 +171,7 @@ func (p *Pixiv) IsLogged() bool {
 	return strings.Contains(string(body), "class=\"item header-logout\"")
 }
 
+// GetIllustMetaData 读取作品的相关信息
 func (p *Pixiv) GetIllustMetaData(illustID string) {
 	p.wc.InitHeaders()
 	p.wc.headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
@@ -177,21 +184,39 @@ func (p *Pixiv) GetIllustMetaData(illustID string) {
 	}
 
 	var iType int
+	var iImageURL []string
 	sBody := string(body)
 	if strings.Contains(sBody, "pixiv.context.ugokuIllustData") {
 		iType = UGOKU
+		url := string(p.illustUgokuURLRe.FindSubmatch(body)[1])
+		url = strings.Replace(url, "\\/", "/", -1)
+		iImageURL = []string{url}
 	} else if strings.Contains(sBody, "class=\"page-count\"") {
 		iType = MULTI
+		pageCount, _ := strconv.Atoi(string(p.illustPageCountRe.FindSubmatch(body)[1]))
+		iImageURL = make([]string, 0)
+		for i := 0; i < pageCount; i++ {
+			iImageURL = append(iImageURL, "https://www.pixiv.net/member_illust.php?mode=manga_big&illust_id="+
+				illustID+"&page="+strconv.Itoa(i))
+		}
 	} else {
 		iType = SINGLE
+		iImageURL = []string{string(p.illustSingleURLRe.FindSubmatch(body)[1])}
 	}
 
 	title := p.illustMetaRe.FindSubmatch(body)
-	sName := string(title[1])
-	sAuthorName := string(title[2])
+	iName := string(title[1])
+	iAuthorName := string(title[2])
 
-	sAuthorID := string(p.illustAuthorIDRe.FindSubmatch(body)[1])
+	iAuthorID := string(p.illustAuthorIDRe.FindSubmatch(body)[1])
 
+	illust := Illust{
+		Name:       iName,
+		IllustID:   illustID,
+		AuthorID:   iAuthorID,
+		AuthorName: iAuthorName,
+		Type:       iType,
+		ImageURL:   iImageURL}
 
-
+	p.IllustsMeta <- illust
 }
