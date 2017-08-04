@@ -32,6 +32,8 @@ func main() {
 			// 保存登录状态
 			p.SaveCookies()
 		}
+	} else {
+		fmt.Println("检测到已登录账号")
 	}
 
 	pagesOfShow := p.GetBookmarkTotalPages("show")
@@ -41,15 +43,17 @@ func main() {
 
 	p.BatchReadIllusts(1, pagesOfShow, "show")
 
+	// 输出解析结果
 	go func() {
 		for {
 			fmt.Println(<-p.IllustsMeta)
 		}
 	}()
 
+	// 输出作品ID读取结果并解析
 	for {
 		id := <-p.Illusts
-		fmt.Println(id)
+		//fmt.Println(id)
 		go p.GetIllustMetaData(id)
 	}
 }

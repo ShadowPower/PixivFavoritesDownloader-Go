@@ -9,11 +9,17 @@ import (
 	"strings"
 )
 
+const MAX_READ_BOOKMARK_TASK = 10 // 最大并发读取收藏夹作品ID任务数量
+const MAX_READ_METADATA_TASK = 10 // 最大并发读取作品信息任务数量
+
 // Pixiv 是一个中文版 Pixiv 网站的封装库
 type Pixiv struct {
 	wc          *WebClient
 	Illusts     chan string
 	IllustsMeta chan Illust
+
+	bookmarkFlag chan int // 用于收藏夹读取任务并发数限制
+	metadataFlag chan int // 用于读取作品信息任务并发数限制
 
 	illustIDRe        *regexp.Regexp // 从收藏夹中获取作品ID的正则表达式
 	illustMetaRe      *regexp.Regexp // 从作品详情页面获取作品标题、作者名字的正则表达式
@@ -29,6 +35,9 @@ func NewPixiv() Pixiv {
 	pixiv := Pixiv{wc: &wc}
 	pixiv.Illusts = make(chan string, 500)
 	pixiv.IllustsMeta = make(chan Illust, 500)
+
+	pixiv.bookmarkFlag = make(chan int, MAX_READ_BOOKMARK_TASK)
+	pixiv.metadataFlag = make(chan int, MAX_READ_METADATA_TASK)
 
 	// 编译正则表达式状态机
 	pixiv.illustIDRe, _ = regexp.Compile("data-click-action=\"illust\"data-click-label=\"(\\d+)\"")
@@ -139,6 +148,12 @@ func (p *Pixiv) GetBookmarkTotalPages(rest string) int {
 
 // ReadIllusts 读取一页收藏夹的作品列表，将作品ID写入到 Illusts 中
 func (p *Pixiv) ReadIllusts(pageNumber int, rest string) {
+	// 并发数限制
+	p.bookmarkFlag <- 0
+	defer func() {
+		<-p.bookmarkFlag
+	}()
+
 	url := "https://www.pixiv.net/bookmark.php?rest=" + rest + "&p=" + strconv.Itoa(pageNumber)
 	body, _, _ := p.wc.Get(url, nil, 5)
 	results := p.illustIDRe.FindAllSubmatch(body, -1)
@@ -173,6 +188,12 @@ func (p *Pixiv) IsLogged() bool {
 
 // GetIllustMetaData 读取作品的相关信息
 func (p *Pixiv) GetIllustMetaData(illustID string) {
+	// 并发数限制
+	p.metadataFlag <- 0
+	defer func() {
+		<-p.metadataFlag
+	}()
+
 	headers := make(map[string]string)
 	headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
 
