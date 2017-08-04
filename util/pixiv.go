@@ -25,7 +25,7 @@ type Pixiv struct {
 
 // NewPixiv 用于创建一个 Pixiv 类的对象
 func NewPixiv() Pixiv {
-	wc := NewWebClient(20)
+	wc := NewWebClient()
 	pixiv := Pixiv{wc: &wc}
 	pixiv.Illusts = make(chan string, 500)
 	pixiv.IllustsMeta = make(chan Illust, 500)
@@ -45,11 +45,11 @@ func (p *Pixiv) getPostKey() (string, error) {
 	url := "https://accounts.pixiv.net/login"
 	re, _ := regexp.Compile("name=\"post_key\" value=\"([a-f0-9]{32})\"")
 
-	p.wc.InitHeaders()
-	p.wc.headers["Host"] = "accounts.pixiv.net"
-	p.wc.headers["Referer"] = "https://www.pixiv.net/"
-	p.wc.headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-	body, _, err := p.wc.Get(url, 5)
+	headers := make(map[string]string)
+	headers["Host"] = "accounts.pixiv.net"
+	headers["Referer"] = "https://www.pixiv.net/"
+	headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+	body, _, err := p.wc.Get(url, headers, 5)
 	if err != nil {
 		return "", errors.New("获取 Post Key 失败")
 	}
@@ -68,16 +68,16 @@ func (p *Pixiv) Login(username, password string) error {
 	}
 
 	// 设置 Headers
-	p.wc.InitHeaders()
-	p.wc.headers["Host"] = "accounts.pixiv.net"
-	p.wc.headers["Referer"] = "https://accounts.pixiv.net/login?lang=zh&source=pc&view_type=page&ref=wwwtop_accounts_index"
-	p.wc.headers["Accept"] = "application/json, text/javascript, */*; q=0.01"
-	p.wc.headers["X-Requested-With"] = "XMLHttpRequest"
-	p.wc.headers["Content-Type"] = "application/x-www-form-urlencoded; charset=UTF-8"
+	headers := make(map[string]string)
+	headers["Host"] = "accounts.pixiv.net"
+	headers["Referer"] = "https://accounts.pixiv.net/login?lang=zh&source=pc&view_type=page&ref=wwwtop_accounts_index"
+	headers["Accept"] = "application/json, text/javascript, */*; q=0.01"
+	headers["X-Requested-With"] = "XMLHttpRequest"
+	headers["Content-Type"] = "application/x-www-form-urlencoded; charset=UTF-8"
 
 	loginPara := "pixiv_id=" + username + "&password=" + password + "&captcha=&g_recaptcha_response=&post_key=" +
 		postKey + "&source=pc&ref=wwwtop_accounts_index&return_to=https%3A%2F%2Fwww.pixiv.net%2F"
-	body, err := p.wc.PostString(url, loginPara)
+	body, err := p.wc.PostString(url, headers, loginPara)
 	if err != nil {
 		return err
 	}
@@ -110,7 +110,7 @@ func (p *Pixiv) Login(username, password string) error {
 // rest: show=公开收藏夹/hide=非公开收藏夹
 func (p *Pixiv) IsBookmarkPageExist(pageNumber int, rest string) bool {
 	url := "https://www.pixiv.net/bookmark.php?rest=" + rest + "&p=" + strconv.Itoa(pageNumber)
-	body, _, err := p.wc.Get(url, 5)
+	body, _, err := p.wc.Get(url, nil, 5)
 	if err != nil {
 		return false
 	}
@@ -140,7 +140,7 @@ func (p *Pixiv) GetBookmarkTotalPages(rest string) int {
 // ReadIllusts 读取一页收藏夹的作品列表，将作品ID写入到 Illusts 中
 func (p *Pixiv) ReadIllusts(pageNumber int, rest string) {
 	url := "https://www.pixiv.net/bookmark.php?rest=" + rest + "&p=" + strconv.Itoa(pageNumber)
-	body, _, _ := p.wc.Get(url, 5)
+	body, _, _ := p.wc.Get(url, nil, 5)
 	results := p.illustIDRe.FindAllSubmatch(body, -1)
 	for _, result := range results {
 		p.Illusts <- string(result[1])
@@ -161,10 +161,10 @@ func (p *Pixiv) SaveCookies() {
 
 // IsLogged 检测登录状态，已登录返回 true，未登录或失败返回 false
 func (p *Pixiv) IsLogged() bool {
-	p.wc.InitHeaders()
-	p.wc.headers["Host"] = "www.pixiv.net"
-	p.wc.headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-	body, _, err := p.wc.Get("https://www.pixiv.net", 2)
+	headers := make(map[string]string)
+	headers["Host"] = "www.pixiv.net"
+	headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+	body, _, err := p.wc.Get("https://www.pixiv.net", headers, 2)
 	if err != nil {
 		return false
 	}
@@ -173,11 +173,11 @@ func (p *Pixiv) IsLogged() bool {
 
 // GetIllustMetaData 读取作品的相关信息
 func (p *Pixiv) GetIllustMetaData(illustID string) {
-	p.wc.InitHeaders()
-	p.wc.headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+	headers := make(map[string]string)
+	headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
 
 	url := "https://www.pixiv.net/member_illust.php?mode=medium&illust_id=" + illustID
-	body, _, err := p.wc.Get(url, 5)
+	body, _, err := p.wc.Get(url, headers, 5)
 	if err != nil {
 		fmt.Println("获取", illustID, "的信息时发生错误")
 		return

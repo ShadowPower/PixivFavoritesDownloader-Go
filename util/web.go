@@ -13,17 +13,15 @@ import (
 )
 
 // WebClient 是一个用来模拟浏览器的类
-// 可以自动记录Cookie，可以限制最大并发连接数
+// 可以自动记录Cookie
 type WebClient struct {
-	Client   *http.Client
-	Cookies  *cookiejar.Jar
-	headers  map[string]string
-	taskFlag chan int // 记录任务个数
+	Client        *http.Client
+	Cookies       *cookiejar.Jar
+	commonHeaders map[string]string // don't write
 }
 
 // NewWebClient 创建一个 WebClient 对象
-// maxConnections: 最大并发连接数
-func NewWebClient(maxConnections int) WebClient {
+func NewWebClient() WebClient {
 	tr := &http.Transport{
 		MaxIdleConns:       10,
 		IdleConnTimeout:    10 * time.Second,
@@ -34,27 +32,27 @@ func NewWebClient(maxConnections int) WebClient {
 	wc.Cookies, _ = cookiejar.New(&options)
 	wc.Client.Jar = wc.Cookies
 	wc.InitHeaders()
-	wc.taskFlag = make(chan int, maxConnections)
 	return wc
 }
 
-// InitHeaders 清除 HTTP 客户端的 Header，并设置默认 UA 和语言
+// InitHeaders 初始化公共 Header
 func (wc *WebClient) InitHeaders() {
-	wc.headers = make(map[string]string)
-	wc.headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:54.0) Gecko/20100101 Firefox/54.0"
-	wc.headers["Accept-Language"] = "zh-CN,zh;q=0.5"
+	wc.commonHeaders = make(map[string]string)
+	wc.commonHeaders["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:54.0) Gecko/20100101 Firefox/54.0"
+	wc.commonHeaders["Accept-Language"] = "zh-CN,zh;q=0.5"
 }
 
 // Get 向指定 URL 发送GET请求，返回响应的主体和状态码
 // url: 指定的 URL， retry: 重试次数
-func (wc *WebClient) Get(url string, retry int) ([]byte, int, error) {
-	// 限制连接数
-	wc.taskFlag <- 0
-	defer func() { <-wc.taskFlag }()
-
+func (wc *WebClient) Get(url string, headers map[string]string, retry int) ([]byte, int, error) {
 	req, _ := http.NewRequest("GET", url, nil)
-	for k, v := range wc.headers {
+	for k, v := range wc.commonHeaders {
 		req.Header.Set(k, v)
+	}
+	if headers != nil {
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
 	}
 GET:
 	resp, err := wc.Client.Do(req)
@@ -74,16 +72,17 @@ GET:
 	return body, resp.StatusCode, nil
 }
 
-func (wc *WebClient) PostString(url, body string) ([]byte, error) {
-	// 限制连接数
-	wc.taskFlag <- 0
-	defer func() { <-wc.taskFlag }()
-
+func (wc *WebClient) PostString(url string, headers map[string]string, body string) ([]byte, error) {
 	data := bytes.NewBufferString(body)
-	wc.headers["Content-Length"] = strconv.Itoa(data.Len())
 	req, _ := http.NewRequest("POST", url, data)
-	for k, v := range wc.headers {
+	for k, v := range wc.commonHeaders {
 		req.Header.Set(k, v)
+	}
+	req.Header.Set("Content-Length", strconv.Itoa(data.Len()))
+	if headers != nil {
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
 	}
 	resp, err := wc.Client.Do(req)
 	if err != nil {
