@@ -42,7 +42,7 @@ func NewPixiv() Pixiv {
 	// 编译正则表达式状态机
 	pixiv.illustIDRe, _ = regexp.Compile("data-click-action=\"illust\"data-click-label=\"(\\d+)\"")
 	pixiv.illustMetaRe, _ = regexp.Compile("meta property=\"og:title\" content=\"「(.*)」/「(.*)」\\[pixiv\\]\"")
-	pixiv.illustAuthorIDRe, _ = regexp.Compile("data-user-id=\"(\\d+)\"")
+	pixiv.illustAuthorIDRe, _ = regexp.Compile("data-user[-_]id=\"(\\d+)\"")
 	pixiv.illustSingleURLRe, _ = regexp.Compile("data-src=\"(.*)\" class=\"original-image\"")
 	pixiv.illustPageCountRe, _ = regexp.Compile("<div class=\"page-count\"><div class=\"icon\"></div><span>(\\d+)</span>")
 	pixiv.illustUgokuURLRe, _ = regexp.Compile("\"src\":\"(.*ugoira1920x1080.zip)\"")
@@ -205,7 +205,7 @@ func (p *Pixiv) GetIllustMetaData(illustID string) {
 	url := "https://www.pixiv.net/member_illust.php?mode=medium&illust_id=" + illustID
 	body, _, err := p.wc.Get(url, headers, 5)
 	if err != nil {
-		fmt.Println("获取", illustID, "的信息时发生错误")
+		fmt.Println("获取", illustID, "的信息时发生错误:", err)
 		return
 	}
 
@@ -233,7 +233,6 @@ func (p *Pixiv) GetIllustMetaData(illustID string) {
 	title := p.illustMetaRe.FindSubmatch(body)
 	iName := string(title[1])
 	iAuthorName := string(title[2])
-
 	iAuthorID := string(p.illustAuthorIDRe.FindSubmatch(body)[1])
 
 	illust := Illust{
