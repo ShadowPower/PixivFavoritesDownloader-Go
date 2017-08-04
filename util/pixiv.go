@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const MAX_READ_BOOKMARK_TASK = 10 // 最大并发读取收藏夹作品ID任务数量
+const MAX_READ_BOOKMARK_TASK = 2 // 最大并发读取收藏夹作品ID任务数量
 const MAX_READ_METADATA_TASK = 10 // 最大并发读取作品信息任务数量
 
 // Pixiv 是一个中文版 Pixiv 网站的封装库
@@ -158,7 +158,12 @@ func (p *Pixiv) ReadIllusts(pageNumber int, rest string) {
 	body, _, _ := p.wc.Get(url, nil, 5)
 	results := p.illustIDRe.FindAllSubmatch(body, -1)
 	for _, result := range results {
-		p.Illusts <- string(result[1])
+		id := string(result[1])
+		// 作品ID = 0 表示作品已经被删除，忽略
+		if id != "0" {
+			p.Illusts <- id
+		}
+
 	}
 }
 
