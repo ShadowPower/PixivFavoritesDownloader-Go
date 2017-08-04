@@ -186,11 +186,11 @@ func (p *Pixiv) GetIllustMetaData(illustID string) {
 		iType = SINGLE
 	}
 
-	title := p.illustMetaRe.FindAllSubmatch(body, -1)
+	title := p.illustMetaRe.FindSubmatch(body)
 	sName := string(title[1])
 	sAuthorName := string(title[2])
 
-	sAuthorID := string(p.illustAuthorIDRe.FindAllSubmatch(body, -1)[1])
+	sAuthorID := string(p.illustAuthorIDRe.FindSubmatch(body)[1])
 
 
 
