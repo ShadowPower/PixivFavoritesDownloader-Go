@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"./util"
+	"github.com/ShadowPower/PixivFavoritesDownloader-Go/util"
 
 	"github.com/howeyc/gopass"
 )

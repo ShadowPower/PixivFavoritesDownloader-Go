@@ -45,7 +45,7 @@ func NewPixiv() Pixiv {
 	pixiv.illustAuthorIDRe, _ = regexp.Compile("data-user[-_]id=\"(\\d+)\"")
 	pixiv.illustSingleURLRe, _ = regexp.Compile("data-src=\"(.*)\" class=\"original-image\"")
 	pixiv.illustPageCountRe, _ = regexp.Compile("<div class=\"page-count\"><div class=\"icon\"></div><span>(\\d+)</span>")
-	pixiv.illustUgokuURLRe, _ = regexp.Compile("\"src\":\"(.*ugoira1920x1080.zip)\"")
+	pixiv.illustUgokuURLRe, _ = regexp.Compile("pixiv.context.ugokuIllustFullscreenData  = {\"src\":\"(.*ugoira1920x1080.zip)\"")
 	return pixiv
 }
 
