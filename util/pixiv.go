@@ -212,7 +212,10 @@ func (p *Pixiv) GetIllustMetaData(illustID string) {
 	var iType int
 	var iImageURL []string
 	sBody := string(body)
-	if strings.Contains(sBody, "pixiv.context.ugokuIllustData") {
+	if strings.Contains(sBody, "class=\"error-title\"") {
+		// 作品被隐藏或者删除
+		return
+	} else if strings.Contains(sBody, "pixiv.context.ugokuIllustData") {
 		iType = UGOKU
 		url := string(p.illustUgokuURLRe.FindSubmatch(body)[1])
 		url = strings.Replace(url, "\\/", "/", -1)
