@@ -133,7 +133,7 @@ func (p *Pixiv) GetBookmarkTotalPages(rest string) int {
 	for p.IsBookmarkPageExist(max, rest) {
 		max *= 3
 	}
-	min = max / 32
+	min = max / 3
 	// 二分查找
 	for max-min > 1 {
 		temp = (max + min) / 2
